@@ -1,902 +1,714 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>서울우유 거창물류 휴무신청</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
-      background: #f5f7fb;
-      color: #111827;
-    }
-    .wrap {
-      max-width: 430px;
-      margin: 0 auto;
-      padding: 16px 14px 40px;
-    }
-    .card {
-      background: #fff;
-      border-radius: 22px;
-      padding: 16px;
-      box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
-      margin-bottom: 14px;
-    }
-    .hero {
-      background: linear-gradient(180deg, #111827 0%, #334155 100%);
-      color: #fff;
-    }
-    .hero h1 {
-      margin: 0;
-      font-size: 24px;
-      font-weight: 800;
-    }
-    .hero p {
-      margin: 8px 0 0;
-      color: #dbeafe;
-      font-size: 14px;
-      line-height: 1.5;
-    }
-    .badge-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 12px;
-    }
-    .badge {
-      background: #fff;
-      color: #111827;
-      border-radius: 999px;
-      padding: 7px 12px;
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .section-title {
-      margin: 0 0 10px;
-      font-size: 17px;
-      font-weight: 800;
-    }
-    .muted {
-      color: #64748b;
-      font-size: 13px;
-      line-height: 1.5;
-    }
-    .month-box {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #f1f5f9;
-      border-radius: 16px;
-      padding: 12px 14px;
-      margin-bottom: 12px;
-    }
-    .month-box button {
-      border: none;
-      background: transparent;
-      font-weight: 800;
-      color: #475569;
-      font-size: 14px;
-      cursor: pointer;
-    }
-    .month-label {
-      font-size: 20px;
-      font-weight: 800;
-      color: #0f172a;
-    }
-    .tabs {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-    .tab-btn {
-      border: none;
-      border-radius: 16px;
-      padding: 14px 12px;
-      font-weight: 800;
-      font-size: 15px;
-      background: #e2e8f0;
-      color: #334155;
-      cursor: pointer;
-    }
-    .tab-btn.active {
-      background: #111827;
-      color: #fff;
-    }
-    .calendar-head, .calendar-grid {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 8px;
-    }
-    .calendar-head div {
-      text-align: center;
-      font-size: 12px;
-      font-weight: 800;
-      color: #64748b;
-      padding: 4px 0;
-    }
-    .calendar-head div.sun { color: #dc2626; }
-    .calendar-head div.sat { color: #2563eb; }
+import React, { useMemo, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { CalendarDays, ClipboardList, Lock, Megaphone, ShieldCheck, Truck } from 'lucide-react';
 
-    .day {
-      border: 1px solid #e2e8f0;
-      border-radius: 18px;
-      background: #fff;
-      min-height: 86px;
-      padding: 8px;
-      text-align: left;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-    }
-    .day.other {
-      background: #f8fafc;
-      color: #cbd5e1;
-    }
-    .day.selected {
-      border-color: #111827;
-      background: #f1f5f9;
-    }
-    .day .num {
-      font-weight: 800;
-      font-size: 14px;
-    }
-    .day .sub {
-      margin-top: 10px;
-      font-size: 11px;
-      color: #64748b;
-    }
-    .day .helper {
-      margin-top: 4px;
-      font-size: 10px;
-      color: #64748b;
-    }
-    .day.sun .num, .day.sun .sub { color: #dc2626; }
-    .day.sat .num, .day.sat .sub { color: #2563eb; }
-    .day.blocked { opacity: 0.55; }
+type VehicleCategory = 'general' | 'igo';
+type GeneralVehicleType = '2.5톤' | '3.5톤' | '5톤';
+type IgoVehicleType = '4.5톤' | '14톤';
 
-    .info-box {
-      background: #f1f5f9;
-      border-radius: 16px;
-      padding: 12px;
-      font-size: 14px;
-      font-weight: 700;
-      line-height: 1.6;
-      color: #0f172a;
-    }
-    .info-box .red { color: #dc2626; }
-    .notice-card {
-      border: 1px solid #e2e8f0;
-      border-radius: 16px;
-      padding: 12px;
-      margin-top: 10px;
-    }
-    .notice-card .title {
-      font-weight: 800;
-      font-size: 14px;
-      margin-bottom: 6px;
-    }
-    .notice-card .body {
-      color: #475569;
-      font-size: 14px;
-      line-height: 1.6;
-    }
+type VehicleRecord = {
+  number: string;
+  name: string;
+  type: string;
+};
 
-    .admin-toggle {
-      width: 100%;
-      border: 1px solid #cbd5e1;
-      background: #fff;
-      border-radius: 16px;
-      padding: 12px;
-      font-weight: 800;
-      cursor: pointer;
-    }
-    .admin-panel {
-      margin-top: 12px;
-      display: none;
-    }
-    .admin-panel.show {
-      display: block;
-    }
-    .admin-row {
-      background: #f8fafc;
-      border-radius: 14px;
-      padding: 10px 12px;
-      margin-top: 8px;
-      font-size: 14px;
-      line-height: 1.5;
-    }
+type SundayRequest = VehicleRecord & {
+  createdAt: string;
+};
 
-    .toast {
-      position: fixed;
-      left: 50%;
-      bottom: 18px;
-      transform: translateX(-50%);
-      width: calc(100% - 28px);
-      max-width: 420px;
-      background: #ecfdf5;
-      color: #047857;
-      border: 1px solid #a7f3d0;
-      padding: 14px 16px;
-      border-radius: 16px;
-      font-size: 14px;
-      font-weight: 700;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-      display: none;
-      z-index: 50;
-    }
-    .toast.show { display: block; }
+type WeekdayRequest = VehicleRecord & {
+  date: string;
+  reason: string;
+  createdAt: string;
+};
 
-    .modal {
-      position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.55);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
-      z-index: 100;
+type IgoRequest = VehicleRecord & {
+  date: string;
+  createdAt: string;
+};
+
+type Status = {
+  ok: boolean;
+  text: string;
+};
+
+const NOW = new Date('2026-04-13T19:00:00+09:00');
+
+const vehicleMaster: Record<VehicleCategory, VehicleRecord[]> = {
+  general: [
+    { number: '1234', name: '홍길동', type: '5톤' },
+    { number: '2345', name: '김철수', type: '3.5톤' },
+    { number: '3456', name: '이영희', type: '2.5톤' },
+  ],
+  igo: [
+    { number: '4567', name: '박민수', type: '4.5톤' },
+    { number: '5678', name: '최성호', type: '14톤' },
+  ],
+};
+
+const blockedHolidayDates = ['2026-02-15', '2026-09-27'];
+
+const sundayQuotaByMonth: Record<string, number> = {
+  '2026-05': 3,
+  '2026-06': 2,
+};
+
+const initialGeneralSundayRequests: Record<string, SundayRequest[]> = {
+  '2026-05-03': [{ number: '9001', name: '기신청자', type: '5톤', createdAt: '2026-04-20 16:01' }],
+  '2026-05-10': [],
+  '2026-05-17': [],
+  '2026-05-24': [],
+  '2026-05-31': [],
+};
+
+const initialGeneralWeekdayRequests: WeekdayRequest[] = [];
+const initialIgoRequests: IgoRequest[] = [];
+
+const monthlyBoardPosts = [
+  {
+    month: '2026-05',
+    title: '2026년 5월 휴무신청 접수 안내',
+    body: '일반차량 일요일 및 이고차량 휴무신청은 4월 20일 16:00부터 4월 23일 16:00까지 접수됩니다.',
+  },
+];
+
+const specialNoticePosts = [
+  {
+    title: '명절 휴무신청 제한 안내',
+    body: '설날 및 추석 연휴는 별도 관리 대상이므로 홈페이지 신청이 불가합니다. 별도 공지를 확인해 주세요.',
+  },
+];
+
+function toDateString(date: Date) {
+  const y = date.getFullYear();
+  const m = `${date.getMonth() + 1}`.padStart(2, '0');
+  const d = `${date.getDate()}`.padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function formatMonthKey(date: Date) {
+  return toDateString(date).slice(0, 7);
+}
+
+function formatMonthLabel(monthKey: string) {
+  const [year, month] = monthKey.split('-').map(Number);
+  return `${year}년 ${month}월`;
+}
+
+function moveMonth(monthKey: string, diff: number) {
+  const [year, month] = monthKey.split('-').map(Number);
+  const moved = new Date(year, month - 1 + diff, 1);
+  return formatMonthKey(moved);
+}
+
+function isSunday(date: Date) {
+  return date.getDay() === 0;
+}
+
+function isSaturday(date: Date) {
+  return date.getDay() === 6;
+}
+
+function koreanDay(date: Date) {
+  return ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
+}
+
+function formatKoreanDate(dateStr: string) {
+  const d = new Date(`${dateStr}T00:00:00+09:00`);
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${koreanDay(d)})`;
+}
+
+function getDaysInMonth(year: number, monthIndex: number) {
+  const count = new Date(year, monthIndex + 1, 0).getDate();
+  return Array.from({ length: count }, (_, i) => new Date(year, monthIndex, i + 1));
+}
+
+function getCalendarCells(year: number, monthIndex: number) {
+  const first = new Date(year, monthIndex, 1);
+  const offset = first.getDay();
+  const current = getDaysInMonth(year, monthIndex).map((date) => ({ date, isCurrentMonth: true }));
+  const prevLast = new Date(year, monthIndex, 0).getDate();
+  const leading = Array.from({ length: offset }, (_, i) => ({
+    date: new Date(year, monthIndex - 1, prevLast - offset + i + 1),
+    isCurrentMonth: false,
+  }));
+  const total = leading.length + current.length;
+  const trailingCount = total % 7 === 0 ? 0 : 7 - (total % 7);
+  const trailing = Array.from({ length: trailingCount }, (_, i) => ({
+    date: new Date(year, monthIndex + 1, i + 1),
+    isCurrentMonth: false,
+  }));
+  return [...leading, ...current, ...trailing];
+}
+
+function getApplicationWindow(targetMonth: string) {
+  const [year, month] = targetMonth.split('-').map(Number);
+  return {
+    open: new Date(year, month - 2, 20, 16, 0, 0),
+    close: new Date(year, month - 2, 23, 16, 0, 0),
+  };
+}
+
+function isWithinMonthlyWindow(targetMonth: string) {
+  const { open, close } = getApplicationWindow(targetMonth);
+  return NOW >= open && NOW <= close;
+}
+
+function isBlockedHoliday(dateStr: string) {
+  return blockedHolidayDates.includes(dateStr);
+}
+
+function isSameDay(dateA: Date, dateB: Date) {
+  return toDateString(dateA) === toDateString(dateB);
+}
+
+function isGeneralWeekdayAvailable(dateStr: string) {
+  const selected = new Date(`${dateStr}T00:00:00+09:00`);
+  if (!isSameDay(selected, NOW)) return true;
+  const deadline = new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate(), 12, 0, 0);
+  return NOW <= deadline;
+}
+
+function validateVehicle(category: VehicleCategory, number: string, name: string, type: string) {
+  return vehicleMaster[category].some((v) => v.number === number && v.name === name && v.type === type);
+}
+
+function getGeneralStatus(
+  selectedDate: string,
+  sundayRequests: Record<string, SundayRequest[]>,
+  selectedMonth: string,
+): Status {
+  const date = new Date(`${selectedDate}T00:00:00+09:00`);
+  const sunday = isSunday(date);
+  const blocked = isBlockedHoliday(selectedDate);
+  const quota = sundayQuotaByMonth[selectedMonth] ?? 0;
+  const used = sundayRequests[selectedDate]?.length ?? 0;
+  const withinMonthlyWindow = isWithinMonthlyWindow(selectedMonth);
+
+  if (blocked) {
+    return { ok: false, text: '설날/추석 연휴는 별도 관리 대상이라 신청할 수 없습니다.' };
+  }
+
+  if (sunday) {
+    if (!withinMonthlyWindow) {
+      return { ok: false, text: '일요일 휴무신청은 전월 20일 16:00부터 23일 16:00까지만 가능합니다.' };
     }
-    .modal.show { display: flex; }
-    .modal-box {
-      width: 100%;
-      max-width: 430px;
-      background: #fff;
-      border-radius: 24px;
-      padding: 18px;
-      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
+    if (quota > 0 && used >= quota) {
+      return { ok: false, text: '해당 일요일은 신청 가능 인원이 마감되었습니다.' };
     }
-    .modal-title {
-      margin: 0;
-      font-size: 20px;
-      font-weight: 800;
-    }
-    .modal-desc {
-      margin: 8px 0 14px;
-      font-size: 14px;
-      color: #475569;
-      line-height: 1.5;
-    }
-    .form-group {
-      margin-bottom: 12px;
-    }
-    .form-group label {
-      display: block;
-      margin-bottom: 6px;
-      font-size: 14px;
-      font-weight: 800;
-    }
-    .input, .select, .textarea {
-      width: 100%;
-      border: 1px solid #dbe2ea;
-      border-radius: 16px;
-      padding: 12px 14px;
-      font-size: 15px;
-      background: #fff;
-    }
-    .textarea {
-      min-height: 92px;
-      resize: vertical;
-    }
-    .modal-actions {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 8px;
-    }
-    .btn {
-      border: none;
-      border-radius: 16px;
-      padding: 14px 12px;
-      font-size: 15px;
-      font-weight: 800;
-      cursor: pointer;
-    }
-    .btn.cancel {
-      background: #fff;
-      color: #334155;
-      border: 1px solid #cbd5e1;
-    }
-    .btn.submit {
-      background: #111827;
-      color: #fff;
-    }
-    .hidden {
-      display: none;
-    }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="card hero">
-      <h1>서울우유 거창물류</h1>
-      <p>모바일 휴무신청 시스템<br>날짜를 선택하면 바로 신청 팝업이 열립니다.</p>
-      <div class="badge-row">
-        <div class="badge">일반차량 / 이고차량 분리</div>
-        <div class="badge">관리자 전용 조회</div>
-        <div class="badge">명절 별도 관리</div>
+    return { ok: true, text: `현재 신청 현황: ${used}/${quota}명` };
+  }
+
+  if (!isGeneralWeekdayAvailable(selectedDate)) {
+    return { ok: false, text: '평일 휴무신청은 당일 12:00에 마감됩니다.' };
+  }
+
+  return { ok: true, text: '신청 가능합니다.' };
+}
+
+function getIgoStatus(selectedDate: string, selectedMonth: string): Status {
+  if (isBlockedHoliday(selectedDate)) {
+    return { ok: false, text: '설날/추석 연휴는 이고차량 휴무신청이 불가능합니다.' };
+  }
+  if (!isWithinMonthlyWindow(selectedMonth)) {
+    return { ok: false, text: '이고차량 휴무신청은 전월 20일 16:00부터 23일 16:00까지만 가능합니다.' };
+  }
+  return { ok: true, text: '신청 가능합니다.' };
+}
+
+type CalendarProps = {
+  selectedMonth: string;
+  selectedDate: string;
+  requestType: VehicleCategory;
+  generalSundayRequests: Record<string, SundayRequest[]>;
+  onChangeMonth: (month: string) => void;
+  onClickDate: (date: string) => void;
+};
+
+function MobileCalendar({
+  selectedMonth,
+  selectedDate,
+  requestType,
+  generalSundayRequests,
+  onChangeMonth,
+  onClickDate,
+}: CalendarProps) {
+  const [year, month] = selectedMonth.split('-').map(Number);
+  const cells = getCalendarCells(year, month - 1);
+  const quota = sundayQuotaByMonth[selectedMonth] ?? 0;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between rounded-2xl bg-slate-100 px-4 py-3">
+        <button type="button" className="text-sm font-semibold text-slate-600" onClick={() => onChangeMonth(moveMonth(selectedMonth, -1))}>
+          ‹ 이전달
+        </button>
+        <div className="text-lg font-bold text-slate-900">{formatMonthLabel(selectedMonth)}</div>
+        <button type="button" className="text-sm font-semibold text-slate-600" onClick={() => onChangeMonth(moveMonth(selectedMonth, 1))}>
+          다음달 ›
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-2">
+        {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
+          <div key={day} className={`text-center text-xs font-semibold py-1 ${day === '일' ? 'text-red-500' : day === '토' ? 'text-blue-500' : 'text-slate-500'}`}>
+            {day}
+          </div>
+        ))}
+
+        {cells.map(({ date, isCurrentMonth }) => {
+          const dateStr = toDateString(date);
+          const sunday = isSunday(date);
+          const saturday = isSaturday(date);
+          const selected = dateStr === selectedDate;
+          const blocked = isBlockedHoliday(dateStr);
+          const used = generalSundayRequests[dateStr]?.length ?? 0;
+          const full = requestType === 'general' && sunday && quota > 0 && used >= quota;
+
+          let helper = '';
+          if (isCurrentMonth) {
+            if (blocked) helper = '제한';
+            else if (requestType === 'general' && sunday) helper = `${used}/${quota}`;
+            else if (requestType === 'general') helper = '자유';
+            else helper = '신청';
+          }
+
+          return (
+            <button
+              key={`${dateStr}-${isCurrentMonth ? 'current' : 'other'}`}
+              type="button"
+              onClick={() => {
+                onChangeMonth(dateStr.slice(0, 7));
+                onClickDate(dateStr);
+              }}
+              className={`min-h-[86px] rounded-2xl border p-2 text-left shadow-sm transition ${selected ? 'border-slate-900 bg-slate-100' : 'border-slate-200 bg-white'} ${!isCurrentMonth ? 'bg-slate-50 text-slate-300' : ''} ${blocked ? 'opacity-60' : ''}`}
+            >
+              <div className={`text-sm font-bold ${sunday ? 'text-red-500' : saturday ? 'text-blue-500' : 'text-slate-900'} ${!isCurrentMonth ? 'text-slate-300' : ''}`}>
+                {date.getDate()}
+              </div>
+              <div className={`mt-2 text-[11px] ${sunday ? 'text-red-500' : saturday ? 'text-blue-500' : 'text-slate-500'} ${!isCurrentMonth ? 'text-slate-300' : ''}`}>
+                {koreanDay(date)}
+              </div>
+              {isCurrentMonth && <div className="mt-1 text-[10px] text-slate-500">{helper}</div>}
+              {full && isCurrentMonth && !blocked && <div className="mt-1 text-[10px] text-red-500">마감</div>}
+            </button>
+          );
+        })}
       </div>
     </div>
+  );
+}
 
-    <div class="card">
-      <div class="section-title">신청 대상 월</div>
-      <div class="month-box">
-        <button id="prevMonthBtn">‹ 이전달</button>
-        <div class="month-label" id="monthLabel">2026년 5월</div>
-        <button id="nextMonthBtn">다음달 ›</button>
-      </div>
-      <div class="info-box" id="monthWindowInfo"></div>
-    </div>
+export default function SeoulMilkGeochangLeaveSite() {
+  const [selectedMonth, setSelectedMonth] = useState('2026-05');
+  const [selectedDate, setSelectedDate] = useState('2026-05-03');
+  const [activeTab, setActiveTab] = useState<VehicleCategory>('general');
+  const [popupOpen, setPopupOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [notice, setNotice] = useState('');
 
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="general">일반차량</button>
-      <button class="tab-btn" data-tab="igo">이고차량</button>
-    </div>
+  const [generalSundayRequests, setGeneralSundayRequests] = useState<Record<string, SundayRequest[]>>(initialGeneralSundayRequests);
+  const [generalWeekdayRequests, setGeneralWeekdayRequests] = useState<WeekdayRequest[]>(initialGeneralWeekdayRequests);
+  const [igoRequests, setIgoRequests] = useState<IgoRequest[]>(initialIgoRequests);
 
-    <div class="card">
-      <div class="section-title" id="calendarTitle">일반차량 휴무신청</div>
-      <div class="calendar-head">
-        <div class="sun">일</div>
-        <div>월</div>
-        <div>화</div>
-        <div>수</div>
-        <div>목</div>
-        <div>금</div>
-        <div class="sat">토</div>
-      </div>
-      <div class="calendar-grid" id="calendarGrid"></div>
-      <div class="info-box" style="margin-top:12px;" id="calendarGuide">
-        날짜를 선택하면 일반차량 휴무신청 팝업이 열립니다.
-      </div>
-    </div>
+  const [generalForm, setGeneralForm] = useState<{ number: string; name: string; type: GeneralVehicleType; reason: string }>({
+    number: '',
+    name: '',
+    type: '5톤',
+    reason: '',
+  });
 
-    <div class="card">
-      <div class="section-title">월 휴무 게시판</div>
-      <div class="notice-card">
-        <div class="title">2026년 5월 휴무신청 접수 안내</div>
-        <div class="body">일반차량 일요일 및 이고차량 휴무신청은 4월 20일 16:00부터 4월 23일 16:00까지 접수됩니다.</div>
-      </div>
-    </div>
+  const [igoForm, setIgoForm] = useState<{ number: string; name: string; type: IgoVehicleType }>({
+    number: '',
+    name: '',
+    type: '4.5톤',
+  });
 
-    <div class="card">
-      <div class="section-title">특이사항 공지</div>
-      <div class="notice-card">
-        <div class="title">명절 휴무신청 제한 안내</div>
-        <div class="body">설날 및 추석 연휴는 별도 관리 대상이므로 홈페이지 신청이 불가합니다. 별도 공지를 확인해 주세요.</div>
-      </div>
-    </div>
+  const selectedDateInfo = useMemo(() => new Date(`${selectedDate}T00:00:00+09:00`), [selectedDate]);
+  const generalStatus = useMemo(() => getGeneralStatus(selectedDate, generalSundayRequests, selectedMonth), [selectedDate, generalSundayRequests, selectedMonth]);
+  const igoStatus = useMemo(() => getIgoStatus(selectedDate, selectedMonth), [selectedDate, selectedMonth]);
+  const monthWindow = useMemo(() => getApplicationWindow(selectedMonth), [selectedMonth]);
 
-    <div class="card">
-      <div class="section-title">관리자 전용</div>
-      <button class="admin-toggle" id="adminToggleBtn">관리자 보기</button>
-      <div class="admin-panel" id="adminPanel">
-        <div class="admin-row"><strong>일반차량 일요일 신청 현황</strong><div id="adminSundayList"></div></div>
-        <div class="admin-row"><strong>일반차량 평일 신청 내역</strong><div id="adminWeekdayList"></div></div>
-        <div class="admin-row"><strong>이고차량 신청 내역</strong><div id="adminIgoList"></div></div>
-      </div>
-    </div>
-  </div>
+  const openPopupForDate = (dateStr: string) => {
+    setSelectedDate(dateStr);
+    setPopupOpen(true);
+  };
 
-  <div class="modal" id="requestModal">
-    <div class="modal-box">
-      <h2 class="modal-title" id="modalTitle">일반차량 휴무신청</h2>
-      <div class="modal-desc" id="modalDesc"></div>
+  const resetGeneralForm = () => {
+    setGeneralForm({ number: '', name: '', type: '5톤', reason: '' });
+  };
 
-      <div id="modalGuide" class="info-box" style="margin-bottom:12px;"></div>
+  const resetIgoForm = () => {
+    setIgoForm({ number: '', name: '', type: '4.5톤' });
+  };
 
-      <div class="form-group">
-        <label for="vehicleNumber">차량번호 4자리</label>
-        <input class="input" id="vehicleNumber" placeholder="예: 1234" maxlength="4" inputmode="numeric" />
-      </div>
+  const handleGeneralSubmit = () => {
+    const sunday = isSunday(selectedDateInfo);
 
-      <div class="form-group">
-        <label for="driverName">이름</label>
-        <input class="input" id="driverName" placeholder="예: 홍길동" />
-      </div>
-
-      <div class="form-group">
-        <label for="vehicleType">차종</label>
-        <select class="select" id="vehicleType"></select>
-      </div>
-
-      <div class="form-group hidden" id="reasonGroup">
-        <label for="reasonText">휴무 사유</label>
-        <textarea class="textarea" id="reasonText" placeholder="월요일~토요일 신청 시 사유를 입력해 주세요."></textarea>
-      </div>
-
-      <div class="modal-actions">
-        <button class="btn cancel" id="closeModalBtn">취소</button>
-        <button class="btn submit" id="submitBtn">휴무신청</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="toast" id="toast"></div>
-
-  <script>
-    const NOW = new Date('2026-04-13T19:00:00+09:00');
-
-    const state = {
-      activeTab: 'general',
-      selectedMonth: '2026-05',
-      selectedDate: '2026-05-03',
-      adminOpen: false,
-      blockedHolidayDates: ['2026-02-15', '2026-09-27'],
-      sundayQuotaByMonth: {
-        '2026-05': 3,
-        '2026-06': 2
-      },
-      vehicleMaster: {
-        general: [
-          { number: '1234', name: '홍길동', type: '5톤' },
-          { number: '2345', name: '김철수', type: '3.5톤' },
-          { number: '3456', name: '이영희', type: '2.5톤' }
-        ],
-        igo: [
-          { number: '4567', name: '박민수', type: '4.5톤' },
-          { number: '5678', name: '최성호', type: '14톤' }
-        ]
-      },
-      generalSundayRequests: {
-        '2026-05-03': [
-          { number: '9001', name: '기신청자', type: '5톤', createdAt: '2026-04-20 16:01' }
-        ],
-        '2026-05-10': [],
-        '2026-05-17': [],
-        '2026-05-24': [],
-        '2026-05-31': []
-      },
-      generalWeekdayRequests: [],
-      igoRequests: []
-    };
-
-    const el = {
-      monthLabel: document.getElementById('monthLabel'),
-      monthWindowInfo: document.getElementById('monthWindowInfo'),
-      calendarGrid: document.getElementById('calendarGrid'),
-      calendarTitle: document.getElementById('calendarTitle'),
-      calendarGuide: document.getElementById('calendarGuide'),
-      requestModal: document.getElementById('requestModal'),
-      modalTitle: document.getElementById('modalTitle'),
-      modalDesc: document.getElementById('modalDesc'),
-      modalGuide: document.getElementById('modalGuide'),
-      vehicleNumber: document.getElementById('vehicleNumber'),
-      driverName: document.getElementById('driverName'),
-      vehicleType: document.getElementById('vehicleType'),
-      reasonGroup: document.getElementById('reasonGroup'),
-      reasonText: document.getElementById('reasonText'),
-      toast: document.getElementById('toast'),
-      adminPanel: document.getElementById('adminPanel'),
-      adminToggleBtn: document.getElementById('adminToggleBtn'),
-      adminSundayList: document.getElementById('adminSundayList'),
-      adminWeekdayList: document.getElementById('adminWeekdayList'),
-      adminIgoList: document.getElementById('adminIgoList'),
-      submitBtn: document.getElementById('submitBtn')
-    };
-
-    function toDateString(date) {
-      const y = date.getFullYear();
-      const m = String(date.getMonth() + 1).padStart(2, '0');
-      const d = String(date.getDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
+    if (!validateVehicle('general', generalForm.number, generalForm.name, generalForm.type)) {
+      setNotice('일반차량 등록정보가 일치하지 않습니다. 차량번호, 이름, 차종을 다시 확인해 주세요.');
+      return;
     }
 
-    function monthKey(date) {
-      return toDateString(date).slice(0, 7);
+    if (!generalStatus.ok) {
+      setNotice(generalStatus.text);
+      return;
     }
 
-    function formatMonthLabel(key) {
-      const [y, m] = key.split('-').map(Number);
-      return `${y}년 ${m}월`;
-    }
+    if (sunday) {
+      const monthPrefix = selectedMonth;
+      const alreadyUsedThisMonth = Object.entries(generalSundayRequests).some(([date, rows]) =>
+        date.startsWith(monthPrefix) && rows.some((row) => row.number === generalForm.number),
+      );
 
-    function moveMonth(key, diff) {
-      const [y, m] = key.split('-').map(Number);
-      return monthKey(new Date(y, m - 1 + diff, 1));
-    }
-
-    function koreanDay(date) {
-      return ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
-    }
-
-    function isSunday(date) {
-      return date.getDay() === 0;
-    }
-
-    function isSaturday(date) {
-      return date.getDay() === 6;
-    }
-
-    function isSameDay(a, b) {
-      return toDateString(a) === toDateString(b);
-    }
-
-    function formatKoreanDate(dateStr) {
-      const d = new Date(dateStr + 'T00:00:00+09:00');
-      return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${koreanDay(d)})`;
-    }
-
-    function isBlockedHoliday(dateStr) {
-      return state.blockedHolidayDates.includes(dateStr);
-    }
-
-    function getApplicationWindow(targetMonth) {
-      const [year, month] = targetMonth.split('-').map(Number);
-      return {
-        open: new Date(year, month - 2, 20, 16, 0, 0),
-        close: new Date(year, month - 2, 23, 16, 0, 0)
-      };
-    }
-
-    function isWithinMonthlyWindow(targetMonth) {
-      const { open, close } = getApplicationWindow(targetMonth);
-      return NOW >= open && NOW <= close;
-    }
-
-    function isGeneralWeekdayAvailable(dateStr) {
-      const selected = new Date(dateStr + 'T00:00:00+09:00');
-      if (!isSameDay(selected, NOW)) return true;
-      const deadline = new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate(), 12, 0, 0);
-      return NOW <= deadline;
-    }
-
-    function getDaysInMonth(year, monthIndex) {
-      const count = new Date(year, monthIndex + 1, 0).getDate();
-      return Array.from({ length: count }, (_, i) => new Date(year, monthIndex, i + 1));
-    }
-
-    function getCalendarCells(year, monthIndex) {
-      const first = new Date(year, monthIndex, 1);
-      const offset = first.getDay();
-      const current = getDaysInMonth(year, monthIndex).map(date => ({ date, isCurrentMonth: true }));
-      const prevLast = new Date(year, monthIndex, 0).getDate();
-
-      const leading = Array.from({ length: offset }, (_, i) => ({
-        date: new Date(year, monthIndex - 1, prevLast - offset + i + 1),
-        isCurrentMonth: false
-      }));
-
-      const total = leading.length + current.length;
-      const trailingCount = total % 7 === 0 ? 0 : 7 - (total % 7);
-
-      const trailing = Array.from({ length: trailingCount }, (_, i) => ({
-        date: new Date(year, monthIndex + 1, i + 1),
-        isCurrentMonth: false
-      }));
-
-      return [...leading, ...current, ...trailing];
-    }
-
-    function validateVehicle(category, number, name, type) {
-      return state.vehicleMaster[category].some(v => v.number === number && v.name === name && v.type === type);
-    }
-
-    function getGeneralStatus(dateStr) {
-      const date = new Date(dateStr + 'T00:00:00+09:00');
-      const sunday = isSunday(date);
-      const blocked = isBlockedHoliday(dateStr);
-      const quota = state.sundayQuotaByMonth[state.selectedMonth] || 0;
-      const used = (state.generalSundayRequests[dateStr] || []).length;
-
-      if (blocked) return { ok: false, text: '설날/추석 연휴는 별도 관리 대상이라 신청할 수 없습니다.' };
-
-      if (sunday) {
-        if (!isWithinMonthlyWindow(state.selectedMonth)) {
-          return { ok: false, text: '일요일 휴무신청은 전월 20일 16:00부터 23일 16:00까지만 가능합니다.' };
-        }
-        if (quota > 0 && used >= quota) {
-          return { ok: false, text: '해당 일요일은 신청 가능 인원이 마감되었습니다.' };
-        }
-        return { ok: true, text: `현재 신청 현황: ${used}/${quota}명` };
-      }
-
-      if (!isGeneralWeekdayAvailable(dateStr)) {
-        return { ok: false, text: '평일 휴무신청은 당일 12:00에 마감됩니다.' };
-      }
-
-      return { ok: true, text: '신청 가능합니다.' };
-    }
-
-    function getIgoStatus(dateStr) {
-      if (isBlockedHoliday(dateStr)) {
-        return { ok: false, text: '설날/추석 연휴는 이고차량 휴무신청이 불가능합니다.' };
-      }
-      if (!isWithinMonthlyWindow(state.selectedMonth)) {
-        return { ok: false, text: '이고차량 휴무신청은 전월 20일 16:00부터 23일 16:00까지만 가능합니다.' };
-      }
-      return { ok: true, text: '신청 가능합니다.' };
-    }
-
-    function showToast(message) {
-      el.toast.textContent = message;
-      el.toast.classList.add('show');
-      setTimeout(() => el.toast.classList.remove('show'), 2600);
-    }
-
-    function renderMonthInfo() {
-      const { open, close } = getApplicationWindow(state.selectedMonth);
-      el.monthLabel.textContent = formatMonthLabel(state.selectedMonth);
-      el.monthWindowInfo.innerHTML = `
-        접수 시작: ${open.getMonth() + 1}월 ${open.getDate()}일 16:00<br>
-        접수 마감: ${close.getMonth() + 1}월 ${close.getDate()}일 16:00
-      `;
-    }
-
-    function renderTabs() {
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.tab === state.activeTab);
-      });
-
-      el.calendarTitle.textContent = state.activeTab === 'general' ? '일반차량 휴무신청' : '이고차량 휴무신청';
-      el.calendarGuide.textContent = state.activeTab === 'general'
-        ? '날짜를 선택하면 일반차량 휴무신청 팝업이 열립니다.'
-        : '날짜를 선택하면 이고차량 휴무신청 팝업이 열립니다.';
-    }
-
-    function renderCalendar() {
-      const [year, month] = state.selectedMonth.split('-').map(Number);
-      const cells = getCalendarCells(year, month - 1);
-      const quota = state.sundayQuotaByMonth[state.selectedMonth] || 0;
-
-      el.calendarGrid.innerHTML = cells.map(({ date, isCurrentMonth }) => {
-        const dateStr = toDateString(date);
-        const sunday = isSunday(date);
-        const saturday = isSaturday(date);
-        const selected = dateStr === state.selectedDate;
-        const blocked = isBlockedHoliday(dateStr);
-        const used = (state.generalSundayRequests[dateStr] || []).length;
-        const full = state.activeTab === 'general' && sunday && quota > 0 && used >= quota;
-
-        let helper = '';
-        if (isCurrentMonth) {
-          if (blocked) helper = '제한';
-          else if (state.activeTab === 'general' && sunday) helper = `${used}/${quota}`;
-          else if (state.activeTab === 'general') helper = '자유';
-          else helper = '신청';
-        }
-
-        const classes = [
-          'day',
-          sunday ? 'sun' : '',
-          saturday ? 'sat' : '',
-          selected ? 'selected' : '',
-          !isCurrentMonth ? 'other' : '',
-          blocked ? 'blocked' : ''
-        ].join(' ');
-
-        return `
-          <button class="${classes}" data-date="${dateStr}">
-            <div class="num">${date.getDate()}</div>
-            <div class="sub">${koreanDay(date)}</div>
-            ${isCurrentMonth ? `<div class="helper">${helper}</div>` : ''}
-            ${full && isCurrentMonth && !blocked ? `<div class="helper" style="color:#dc2626;">마감</div>` : ''}
-          </button>
-        `;
-      }).join('');
-
-      document.querySelectorAll('.day').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const dateStr = btn.dataset.date;
-          state.selectedDate = dateStr;
-          state.selectedMonth = dateStr.slice(0, 7);
-          renderAll();
-          openModal();
-        });
-      });
-    }
-
-    function populateVehicleTypeOptions() {
-      const options = state.activeTab === 'general'
-        ? ['2.5톤', '3.5톤', '5톤']
-        : ['4.5톤', '14톤'];
-
-      el.vehicleType.innerHTML = options.map(type => `<option value="${type}">${type}</option>`).join('');
-    }
-
-    function openModal() {
-      const sunday = isSunday(new Date(state.selectedDate + 'T00:00:00+09:00'));
-      el.modalTitle.textContent = state.activeTab === 'general' ? '일반차량 휴무신청' : '이고차량 휴무신청';
-      el.modalDesc.innerHTML = `선택 날짜: <strong>${formatKoreanDate(state.selectedDate)}</strong>`;
-      populateVehicleTypeOptions();
-
-      el.vehicleNumber.value = '';
-      el.driverName.value = '';
-      el.reasonText.value = '';
-      el.reasonGroup.classList.add('hidden');
-
-      if (state.activeTab === 'general') {
-        el.submitBtn.textContent = '일반차량 휴무신청';
-
-        if (sunday) {
-          const status = getGeneralStatus(state.selectedDate);
-          el.modalGuide.innerHTML = `
-            일반차량 일요일 휴무신청은 전월 <span class="red">20일 16:00부터 23일 16:00까지</span> 신청할 수 있으며, 일요일 휴무신청은 월 1회만 접수됩니다.
-            <div style="margin-top:8px; font-size:14px; color:#475569;">${status.text}</div>
-          `;
-        } else {
-          const status = getGeneralStatus(state.selectedDate);
-          el.reasonGroup.classList.remove('hidden');
-          el.modalGuide.innerHTML = `
-            일반차량 평일 휴무신청은 별도 신청 기간 없이 자유롭게 신청할 수 있으며, <span class="red">당일 신청은 12:00까지</span> 가능합니다.
-            ${!status.ok ? `<div style="margin-top:8px; font-size:14px; color:#475569;">${status.text}</div>` : ''}
-          `;
-        }
-      } else {
-        el.submitBtn.textContent = '이고차량 휴무신청';
-        const status = getIgoStatus(state.selectedDate);
-        el.modalGuide.innerHTML = `
-          이고차량 휴무신청은 전월 <span class="red">20일 16:00부터 23일 16:00까지</span> 신청할 수 있으며, 마감 이후에는 추가 신청이 불가합니다.
-          <div style="margin-top:8px; font-size:14px; color:#475569;">${status.text}</div>
-        `;
-      }
-
-      el.requestModal.classList.add('show');
-    }
-
-    function closeModal() {
-      el.requestModal.classList.remove('show');
-    }
-
-    function renderAdmin() {
-      el.adminToggleBtn.textContent = state.adminOpen ? '관리자 닫기' : '관리자 보기';
-      el.adminPanel.classList.toggle('show', state.adminOpen);
-
-      el.adminSundayList.innerHTML = Object.keys(state.generalSundayRequests).length
-        ? Object.entries(state.generalSundayRequests).map(([date, rows]) =>
-            `<div style="margin-top:8px;">${formatKoreanDate(date)} / ${rows.length}명 / ${state.sundayQuotaByMonth[date.slice(0, 7)] || 0}명</div>`
-          ).join('')
-        : '<div style="margin-top:8px;">신청 내역이 없습니다.</div>';
-
-      el.adminWeekdayList.innerHTML = state.generalWeekdayRequests.length
-        ? state.generalWeekdayRequests.map(row =>
-            `<div style="margin-top:8px;">${formatKoreanDate(row.date)} / ${row.number} / ${row.name} / ${row.type}<br><span style="color:#64748b;">사유: ${row.reason}</span></div>`
-          ).join('')
-        : '<div style="margin-top:8px;">신청 내역이 없습니다.</div>';
-
-      el.adminIgoList.innerHTML = state.igoRequests.length
-        ? state.igoRequests.map(row =>
-            `<div style="margin-top:8px;">${formatKoreanDate(row.date)} / ${row.number} / ${row.name} / ${row.type}</div>`
-          ).join('')
-        : '<div style="margin-top:8px;">신청 내역이 없습니다.</div>';
-    }
-
-    function renderAll() {
-      renderMonthInfo();
-      renderTabs();
-      renderCalendar();
-      renderAdmin();
-    }
-
-    document.getElementById('prevMonthBtn').addEventListener('click', () => {
-      state.selectedMonth = moveMonth(state.selectedMonth, -1);
-      renderAll();
-    });
-
-    document.getElementById('nextMonthBtn').addEventListener('click', () => {
-      state.selectedMonth = moveMonth(state.selectedMonth, 1);
-      renderAll();
-    });
-
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.activeTab = btn.dataset.tab;
-        renderAll();
-      });
-    });
-
-    el.adminToggleBtn.addEventListener('click', () => {
-      state.adminOpen = !state.adminOpen;
-      renderAdmin();
-    });
-
-    document.getElementById('closeModalBtn').addEventListener('click', closeModal);
-
-    el.requestModal.addEventListener('click', (e) => {
-      if (e.target === el.requestModal) closeModal();
-    });
-
-    el.vehicleNumber.addEventListener('input', () => {
-      el.vehicleNumber.value = el.vehicleNumber.value.replace(/\D/g, '').slice(0, 4);
-    });
-
-    el.submitBtn.addEventListener('click', () => {
-      const number = el.vehicleNumber.value.trim();
-      const name = el.driverName.value.trim();
-      const type = el.vehicleType.value;
-      const reason = el.reasonText.value.trim();
-
-      if (!number || !name || !type) {
-        showToast('차량번호, 이름, 차종을 모두 입력해 주세요.');
+      if (alreadyUsedThisMonth) {
+        setNotice('일반차량 일요일 휴무신청은 월 1회만 가능합니다.');
         return;
       }
 
-      if (state.activeTab === 'general') {
-        const sunday = isSunday(new Date(state.selectedDate + 'T00:00:00+09:00'));
-        const status = getGeneralStatus(state.selectedDate);
-
-        if (!validateVehicle('general', number, name, type)) {
-          showToast('일반차량 등록정보가 일치하지 않습니다.');
-          return;
-        }
-
-        if (!status.ok) {
-          showToast(status.text);
-          return;
-        }
-
-        if (sunday) {
-          const alreadyUsedThisMonth = Object.entries(state.generalSundayRequests).some(([date, rows]) =>
-            date.startsWith(state.selectedMonth) && rows.some(row => row.number === number)
-          );
-
-          if (alreadyUsedThisMonth) {
-            showToast('일반차량 일요일 휴무신청은 월 1회만 가능합니다.');
-            return;
-          }
-
-          if (!state.generalSundayRequests[state.selectedDate]) {
-            state.generalSundayRequests[state.selectedDate] = [];
-          }
-
-          state.generalSundayRequests[state.selectedDate].push({
-            number,
-            name,
-            type,
-            createdAt: '실시간 접수'
-          });
-        } else {
-          if (!reason) {
-            showToast('월요일~토요일 휴무신청은 사유를 반드시 입력해야 합니다.');
-            return;
-          }
-
-          state.generalWeekdayRequests.push({
-            date: state.selectedDate,
-            number,
-            name,
-            type,
-            reason,
-            createdAt: '실시간 접수'
-          });
-        }
-
-        showToast(`일반차량 휴무신청이 완료되었습니다. 신청일: ${formatKoreanDate(state.selectedDate)}`);
-      } else {
-        const status = getIgoStatus(state.selectedDate);
-
-        if (!validateVehicle('igo', number, name, type)) {
-          showToast('이고차량 등록정보가 일치하지 않습니다.');
-          return;
-        }
-
-        if (!status.ok) {
-          showToast(status.text);
-          return;
-        }
-
-        const duplicate = state.igoRequests.some(row => row.date === state.selectedDate && row.number === number);
-        if (duplicate) {
-          showToast('해당 이고차량은 같은 날짜에 이미 신청되어 있습니다.');
-          return;
-        }
-
-        state.igoRequests.push({
-          date: state.selectedDate,
-          number,
-          name,
-          type,
-          createdAt: '실시간 접수'
-        });
-
-        showToast(`이고차량 휴무신청이 완료되었습니다. 신청일: ${formatKoreanDate(state.selectedDate)}`);
+      const rows = generalSundayRequests[selectedDate] ?? [];
+      setGeneralSundayRequests({
+        ...generalSundayRequests,
+        [selectedDate]: [...rows, { number: generalForm.number, name: generalForm.name, type: generalForm.type, createdAt: '실시간 접수' }],
+      });
+    } else {
+      if (!generalForm.reason.trim()) {
+        setNotice('월요일~토요일 휴무신청은 사유를 반드시 입력해야 합니다.');
+        return;
       }
 
-      closeModal();
-      renderAll();
-    });
+      setGeneralWeekdayRequests([
+        ...generalWeekdayRequests,
+        {
+          date: selectedDate,
+          number: generalForm.number,
+          name: generalForm.name,
+          type: generalForm.type,
+          reason: generalForm.reason,
+          createdAt: '실시간 접수',
+        },
+      ]);
+    }
 
-    renderAll();
-  </script>
-</body>
-</html>
+    setNotice(`일반차량 휴무신청이 완료되었습니다. 신청일: ${formatKoreanDate(selectedDate)}`);
+    resetGeneralForm();
+    setPopupOpen(false);
+  };
+
+  const handleIgoSubmit = () => {
+    if (!validateVehicle('igo', igoForm.number, igoForm.name, igoForm.type)) {
+      setNotice('이고차량 등록정보가 일치하지 않습니다. 차량번호, 이름, 차종을 다시 확인해 주세요.');
+      return;
+    }
+
+    if (!igoStatus.ok) {
+      setNotice(igoStatus.text);
+      return;
+    }
+
+    const duplicate = igoRequests.some((row) => row.date === selectedDate && row.number === igoForm.number);
+    if (duplicate) {
+      setNotice('해당 이고차량은 같은 날짜에 이미 신청되어 있습니다.');
+      return;
+    }
+
+    setIgoRequests([
+      ...igoRequests,
+      { date: selectedDate, number: igoForm.number, name: igoForm.name, type: igoForm.type, createdAt: '실시간 접수' },
+    ]);
+
+    setNotice(`이고차량 휴무신청이 완료되었습니다. 신청일: ${formatKoreanDate(selectedDate)}`);
+    resetIgoForm();
+    setPopupOpen(false);
+  };
+
+  const renderGeneralPopupGuide = () => {
+    if (isSunday(selectedDateInfo)) {
+      return (
+        <div className="rounded-2xl bg-slate-100 p-3 text-sm font-semibold text-slate-900">
+          일반차량 일요일 휴무신청은 전월 <span className="text-red-500">20일 16:00부터 23일 16:00까지</span> 신청할 수 있으며, 일요일 휴무신청은 월 1회만 접수됩니다.
+          <div className="mt-2 text-sm text-slate-700">{generalStatus.text}</div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="rounded-2xl bg-slate-100 p-3 text-sm font-semibold text-slate-900">
+        일반차량 평일 휴무신청은 별도 신청 기간 없이 자유롭게 신청할 수 있으며, <span className="text-red-500">당일 신청은 12:00까지</span> 가능합니다.
+        {!generalStatus.ok && <div className="mt-2 text-sm text-slate-700">{generalStatus.text}</div>}
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-4 pb-24">
+      <div className="mx-auto max-w-md space-y-4">
+        <Card className="rounded-3xl border-0 bg-gradient-to-b from-slate-900 to-slate-700 text-white shadow-lg">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-xl">서울우유 거창물류</CardTitle>
+                <p className="mt-1 text-sm text-slate-200">모바일 휴무신청 시스템</p>
+              </div>
+              <CalendarDays className="h-8 w-8" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Badge className="bg-white text-slate-900 hover:bg-white">일반차량 / 이고차량 분리</Badge>
+              <Badge className="bg-white text-slate-900 hover:bg-white">관리자 전용 조회</Badge>
+              <Badge className="bg-white text-slate-900 hover:bg-white">명절 별도 관리</Badge>
+            </div>
+            <div className="text-xs leading-5 text-slate-200">모바일에서 날짜를 선택하면 바로 신청 팝업이 열립니다.</div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border-0 shadow-sm">
+          <CardContent className="space-y-3 pt-6">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold">신청 대상 월</Label>
+              <div className="text-sm font-bold text-slate-900">{formatMonthLabel(selectedMonth)}</div>
+            </div>
+            <div className="rounded-2xl bg-slate-100 p-3 text-xs leading-5 text-slate-600">
+              접수 시작: {monthWindow.open.getMonth() + 1}월 {monthWindow.open.getDate()}일 16:00
+              <br />
+              접수 마감: {monthWindow.close.getMonth() + 1}월 {monthWindow.close.getDate()}일 16:00
+            </div>
+          </CardContent>
+        </Card>
+
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as VehicleCategory)} className="space-y-4">
+          <TabsList className="grid h-auto grid-cols-2 rounded-2xl p-1">
+            <TabsTrigger value="general" className="rounded-2xl py-3">일반차량</TabsTrigger>
+            <TabsTrigger value="igo" className="rounded-2xl py-3">이고차량</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="general" className="space-y-4">
+            <Card className="rounded-3xl border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base"><Truck className="h-4 w-4" />일반차량 휴무신청</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <MobileCalendar
+                  selectedMonth={selectedMonth}
+                  selectedDate={selectedDate}
+                  requestType="general"
+                  generalSundayRequests={generalSundayRequests}
+                  onChangeMonth={setSelectedMonth}
+                  onClickDate={openPopupForDate}
+                />
+                <div className="rounded-2xl bg-slate-100 p-3 text-sm font-semibold text-slate-900">날짜를 선택하면 일반차량 휴무신청 팝업이 열립니다.</div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="igo" className="space-y-4">
+            <Card className="rounded-3xl border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base"><Truck className="h-4 w-4" />이고차량 휴무신청</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <MobileCalendar
+                  selectedMonth={selectedMonth}
+                  selectedDate={selectedDate}
+                  requestType="igo"
+                  generalSundayRequests={generalSundayRequests}
+                  onChangeMonth={setSelectedMonth}
+                  onClickDate={openPopupForDate}
+                />
+                <div className="rounded-2xl bg-slate-100 p-3 text-sm font-semibold text-slate-900">날짜를 선택하면 이고차량 휴무신청 팝업이 열립니다.</div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {notice && (
+          <Card className="rounded-3xl border-0 bg-emerald-50 shadow-sm">
+            <CardContent className="pt-6 text-sm text-emerald-700">{notice}</CardContent>
+          </Card>
+        )}
+
+        <Dialog open={popupOpen} onOpenChange={setPopupOpen}>
+          <DialogContent className="max-w-md rounded-3xl">
+            <DialogHeader>
+              <DialogTitle className="text-lg">{activeTab === 'general' ? '일반차량 휴무신청' : '이고차량 휴무신청'}</DialogTitle>
+              <DialogDescription className="text-sm leading-6">
+                선택 날짜: <span className="font-semibold text-slate-900">{formatKoreanDate(selectedDate)}</span>
+              </DialogDescription>
+            </DialogHeader>
+
+            {activeTab === 'general' ? (
+              <div className="space-y-4">
+                {renderGeneralPopupGuide()}
+                <div className="grid gap-3">
+                  <div>
+                    <Label>차량번호 4자리</Label>
+                    <Input value={generalForm.number} onChange={(e) => setGeneralForm({ ...generalForm, number: e.target.value.replace(/\D/g, '').slice(0, 4) })} className="mt-1 rounded-2xl" placeholder="예: 1234" inputMode="numeric" />
+                  </div>
+                  <div>
+                    <Label>이름</Label>
+                    <Input value={generalForm.name} onChange={(e) => setGeneralForm({ ...generalForm, name: e.target.value })} className="mt-1 rounded-2xl" placeholder="예: 홍길동" />
+                  </div>
+                  <div>
+                    <Label>차종</Label>
+                    <select value={generalForm.type} onChange={(e) => setGeneralForm({ ...generalForm, type: e.target.value as GeneralVehicleType })} className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                      <option value="2.5톤">2.5톤</option>
+                      <option value="3.5톤">3.5톤</option>
+                      <option value="5톤">5톤</option>
+                    </select>
+                  </div>
+                  {!isSunday(selectedDateInfo) && (
+                    <div>
+                      <Label>휴무 사유</Label>
+                      <Textarea value={generalForm.reason} onChange={(e) => setGeneralForm({ ...generalForm, reason: e.target.value })} className="mt-1 rounded-2xl" placeholder="월요일~토요일 신청 시 사유를 입력해 주세요." />
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button type="button" variant="outline" className="rounded-2xl py-6" onClick={() => setPopupOpen(false)}>
+                      취소
+                    </Button>
+                    <Button type="button" className="rounded-2xl py-6 text-base" onClick={handleGeneralSubmit}>
+                      일반차량 휴무신청
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-2xl bg-slate-100 p-3 text-sm font-semibold text-slate-900">
+                  이고차량 휴무신청은 전월 <span className="text-red-500">20일 16:00부터 23일 16:00까지</span> 신청할 수 있으며, 마감 이후에는 추가 신청이 불가합니다.
+                  <div className="mt-2 text-sm text-slate-700">{igoStatus.text}</div>
+                </div>
+                <div className="grid gap-3">
+                  <div>
+                    <Label>차량번호 4자리</Label>
+                    <Input value={igoForm.number} onChange={(e) => setIgoForm({ ...igoForm, number: e.target.value.replace(/\D/g, '').slice(0, 4) })} className="mt-1 rounded-2xl" placeholder="예: 4567" inputMode="numeric" />
+                  </div>
+                  <div>
+                    <Label>이름</Label>
+                    <Input value={igoForm.name} onChange={(e) => setIgoForm({ ...igoForm, name: e.target.value })} className="mt-1 rounded-2xl" placeholder="예: 홍길동" />
+                  </div>
+                  <div>
+                    <Label>차종</Label>
+                    <select value={igoForm.type} onChange={(e) => setIgoForm({ ...igoForm, type: e.target.value as IgoVehicleType })} className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                      <option value="4.5톤">4.5톤</option>
+                      <option value="14톤">14톤</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button type="button" variant="outline" className="rounded-2xl py-6" onClick={() => setPopupOpen(false)}>
+                      취소
+                    </Button>
+                    <Button type="button" className="rounded-2xl py-6 text-base" onClick={handleIgoSubmit}>
+                      이고차량 휴무신청
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        <Card className="rounded-3xl border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base"><Megaphone className="h-4 w-4" />월 휴무 게시판</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {monthlyBoardPosts.map((post, idx) => (
+              <div key={idx} className="rounded-2xl border border-slate-200 p-3">
+                <div className="text-sm font-semibold">{post.title}</div>
+                <div className="mt-1 text-xs text-slate-500">대상월: {post.month}</div>
+                <div className="mt-2 text-sm leading-6 text-slate-700">{post.body}</div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-4 w-4" />특이사항 공지</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {specialNoticePosts.map((post, idx) => (
+              <div key={idx} className="rounded-2xl border border-slate-200 p-3">
+                <div className="text-sm font-semibold">{post.title}</div>
+                <div className="mt-2 text-sm leading-6 text-slate-700">{post.body}</div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border-0 shadow-sm">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-4 w-4" />관리자 전용</CardTitle>
+              <Button variant="outline" className="rounded-2xl" onClick={() => setIsAdmin((prev) => !prev)}>
+                {isAdmin ? '관리자 닫기' : '관리자 보기'}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {!isAdmin ? (
+              <div className="flex items-center gap-2 rounded-2xl bg-slate-100 p-4 text-sm text-slate-600">
+                <Lock className="h-4 w-4" />신청 현황, 신청 인원, 사유, 상세 명단은 관리자만 열람 가능합니다.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-200 p-4">
+                  <div className="mb-2 text-sm font-semibold">일반차량 일요일 신청 현황</div>
+                  <div className="space-y-2 text-sm">
+                    {Object.entries(generalSundayRequests).map(([date, rows]) => (
+                      <div key={date} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+                        <span>{formatKoreanDate(date)}</span>
+                        <span>{rows.length}명 / {sundayQuotaByMonth[date.slice(0, 7)] ?? 0}명</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 p-4">
+                  <div className="mb-2 text-sm font-semibold">일반차량 평일 신청 내역</div>
+                  <div className="space-y-2 text-sm">
+                    {generalWeekdayRequests.length === 0 ? (
+                      <div className="rounded-xl bg-slate-50 px-3 py-2 text-slate-500">신청 내역이 없습니다.</div>
+                    ) : (
+                      generalWeekdayRequests.map((row, idx) => (
+                        <div key={`${row.date}-${row.number}-${idx}`} className="rounded-xl bg-slate-50 px-3 py-2">
+                          {formatKoreanDate(row.date)} / {row.number} / {row.name} / {row.type}
+                          <br />
+                          <span className="text-slate-500">사유: {row.reason}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 p-4">
+                  <div className="mb-2 text-sm font-semibold">이고차량 신청 내역</div>
+                  <div className="space-y-2 text-sm">
+                    {igoRequests.length === 0 ? (
+                      <div className="rounded-xl bg-slate-50 px-3 py-2 text-slate-500">신청 내역이 없습니다.</div>
+                    ) : (
+                      igoRequests.map((row, idx) => (
+                        <div key={`${row.date}-${row.number}-${idx}`} className="rounded-xl bg-slate-50 px-3 py-2">
+                          {formatKoreanDate(row.date)} / {row.number} / {row.name} / {row.type}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
