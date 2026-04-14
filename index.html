@@ -1,1 +1,781 @@
+import React, { useMemo, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { CalendarDays, ClipboardList, Lock, Megaphone, ShieldCheck, Truck, Milk, Building2, Image as ImageIcon } from 'lucide-react';
+
+type VehicleCategory = 'general' | 'igo';
+type GeneralVehicleType = '2.5톤' | '3.5톤' | '5톤';
+type IgoVehicleType = '4.5톤' | '14톤';
+
+type VehicleRecord = {
+  number: string;
+  name: string;
+  type: string;
+};
+
+type SundayRequest = VehicleRecord & {
+  createdAt: string;
+};
+
+type WeekdayRequest = VehicleRecord & {
+  date: string;
+  reason: string;
+  createdAt: string;
+};
+
+type IgoRequest = VehicleRecord & {
+  date: string;
+  createdAt: string;
+};
+
+type Status = {
+  ok: boolean;
+  text: string;
+};
+
+const NOW = new Date('2026-04-13T19:00:00+09:00');
+
+const vehicleMaster: Record<VehicleCategory, VehicleRecord[]> = {
+  general: [
+    { number: '1234', name: '홍길동', type: '5톤' },
+    { number: '2345', name: '김철수', type: '3.5톤' },
+    { number: '3456', name: '이영희', type: '2.5톤' },
+  ],
+  igo: [
+    { number: '4567', name: '박민수', type: '4.5톤' },
+    { number: '5678', name: '최성호', type: '14톤' },
+  ],
+};
+
+const blockedHolidayDates = ['2026-02-15', '2026-09-27'];
+
+const sundayQuotaByMonth: Record<string, number> = {
+  '2026-05': 3,
+  '2026-06': 2,
+};
+
+const initialGeneralSundayRequests: Record<string, SundayRequest[]> = {
+  '2026-05-03': [{ number: '9001', name: '기신청자', type: '5톤', createdAt: '2026-04-20 16:01' }],
+  '2026-05-10': [],
+  '2026-05-17': [],
+  '2026-05-24': [],
+  '2026-05-31': [],
+};
+
+const initialGeneralWeekdayRequests: WeekdayRequest[] = [];
+const initialIgoRequests: IgoRequest[] = [];
+
+const monthlyBoardPosts = [
+  {
+    month: '2026-05',
+    title: '2026년 5월 휴무신청 접수 안내',
+    body: '일반차량 일요일 및 이고차량 휴무신청은 4월 20일 16:00부터 4월 23일 16:00까지 접수됩니다.',
+  },
+];
+
+const specialNoticePosts = [
+  {
+    title: '명절 휴무신청 제한 안내',
+    body: '설날 및 추석 연휴는 별도 관리 대상이므로 홈페이지 신청이 불가합니다. 별도 공지를 확인해 주세요.',
+  },
+];
+
+function toDateString(date: Date) {
+  const y = date.getFullYear();
+  const m = `${date.getMonth() + 1}`.padStart(2, '0');
+  const d = `${date.getDate()}`.padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function formatMonthKey(date: Date) {
+  return toDateString(date).slice(0, 7);
+}
+
+function formatMonthLabel(monthKey: string) {
+  const [year, month] = monthKey.split('-').map(Number);
+  return `${year}년 ${month}월`;
+}
+
+function moveMonth(monthKey: string, diff: number) {
+  const [year, month] = monthKey.split('-').map(Number);
+  const moved = new Date(year, month - 1 + diff, 1);
+  return formatMonthKey(moved);
+}
+
+function isSunday(date: Date) {
+  return date.getDay() === 0;
+}
+
+function isSaturday(date: Date) {
+  return date.getDay() === 6;
+}
+
+function koreanDay(date: Date) {
+  return ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
+}
+
+function formatKoreanDate(dateStr: string) {
+  const d = new Date(`${dateStr}T00:00:00+09:00`);
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${koreanDay(d)})`;
+}
+
+function getDaysInMonth(year: number, monthIndex: number) {
+  const count = new Date(year, monthIndex + 1, 0).getDate();
+  return Array.from({ length: count }, (_, i) => new Date(year, monthIndex, i + 1));
+}
+
+function getCalendarCells(year: number, monthIndex: number) {
+  const first = new Date(year, monthIndex, 1);
+  const offset = first.getDay();
+  const current = getDaysInMonth(year, monthIndex).map((date) => ({ date, isCurrentMonth: true }));
+  const prevLast = new Date(year, monthIndex, 0).getDate();
+  const leading = Array.from({ length: offset }, (_, i) => ({
+    date: new Date(year, monthIndex - 1, prevLast - offset + i + 1),
+    isCurrentMonth: false,
+  }));
+  const total = leading.length + current.length;
+  const trailingCount = total % 7 === 0 ? 0 : 7 - (total % 7);
+  const trailing = Array.from({ length: trailingCount }, (_, i) => ({
+    date: new Date(year, monthIndex + 1, i + 1),
+    isCurrentMonth: false,
+  }));
+  return [...leading, ...current, ...trailing];
+}
+
+function getApplicationWindow(targetMonth: string) {
+  const [year, month] = targetMonth.split('-').map(Number);
+  return {
+    open: new Date(year, month - 2, 20, 16, 0, 0),
+    close: new Date(year, month - 2, 23, 16, 0, 0),
+  };
+}
+
+function isWithinMonthlyWindow(targetMonth: string) {
+  const { open, close } = getApplicationWindow(targetMonth);
+  return NOW >= open && NOW <= close;
+}
+
+function isBlockedHoliday(dateStr: string) {
+  return blockedHolidayDates.includes(dateStr);
+}
+
+function isSameDay(dateA: Date, dateB: Date) {
+  return toDateString(dateA) === toDateString(dateB);
+}
+
+function isGeneralWeekdayAvailable(dateStr: string) {
+  const selected = new Date(`${dateStr}T00:00:00+09:00`);
+  if (!isSameDay(selected, NOW)) return true;
+  const deadline = new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate(), 12, 0, 0);
+  return NOW <= deadline;
+}
+
+function validateVehicle(category: VehicleCategory, number: string, name: string, type: string) {
+  return vehicleMaster[category].some((v) => v.number === number && v.name === name && v.type === type);
+}
+
+function getGeneralStatus(
+  selectedDate: string,
+  sundayRequests: Record<string, SundayRequest[]>,
+  selectedMonth: string,
+): Status {
+  const date = new Date(`${selectedDate}T00:00:00+09:00`);
+  const sunday = isSunday(date);
+  const blocked = isBlockedHoliday(selectedDate);
+  const quota = sundayQuotaByMonth[selectedMonth] ?? 0;
+  const used = sundayRequests[selectedDate]?.length ?? 0;
+  const withinMonthlyWindow = isWithinMonthlyWindow(selectedMonth);
+
+  if (blocked) {
+    return { ok: false, text: '설날/추석 연휴는 별도 관리 대상이라 신청할 수 없습니다.' };
+  }
+
+  if (sunday) {
+    if (!withinMonthlyWindow) {
+      return { ok: false, text: '일요일 휴무신청은 전월 20일 16:00부터 23일 16:00까지만 가능합니다.' };
+    }
+    if (quota > 0 && used >= quota) {
+      return { ok: false, text: '해당 일요일은 신청 가능 인원이 마감되었습니다.' };
+    }
+    return { ok: true, text: `현재 신청 현황: ${used}/${quota}명` };
+  }
+
+  if (!isGeneralWeekdayAvailable(selectedDate)) {
+    return { ok: false, text: '평일 휴무신청은 당일 12:00에 마감됩니다.' };
+  }
+
+  return { ok: true, text: '신청 가능합니다.' };
+}
+
+function getIgoStatus(selectedDate: string, selectedMonth: string): Status {
+  if (isBlockedHoliday(selectedDate)) {
+    return { ok: false, text: '설날/추석 연휴는 이고차량 휴무신청이 불가능합니다.' };
+  }
+  if (!isWithinMonthlyWindow(selectedMonth)) {
+    return { ok: false, text: '이고차량 휴무신청은 전월 20일 16:00부터 23일 16:00까지만 가능합니다.' };
+  }
+  return { ok: true, text: '신청 가능합니다.' };
+}
+
+type CalendarProps = {
+  selectedMonth: string;
+  selectedDate: string;
+  requestType: VehicleCategory;
+  generalSundayRequests: Record<string, SundayRequest[]>;
+  onChangeMonth: (month: string) => void;
+  onClickDate: (date: string) => void;
+};
+
+function MobileCalendar({
+  selectedMonth,
+  selectedDate,
+  requestType,
+  generalSundayRequests,
+  onChangeMonth,
+  onClickDate,
+}: CalendarProps) {
+  const [year, month] = selectedMonth.split('-').map(Number);
+  const cells = getCalendarCells(year, month - 1);
+  const quota = sundayQuotaByMonth[selectedMonth] ?? 0;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between rounded-2xl bg-slate-100 px-4 py-3">
+        <button type="button" className="text-sm font-semibold text-slate-600" onClick={() => onChangeMonth(moveMonth(selectedMonth, -1))}>
+          ‹ 이전달
+        </button>
+        <div className="text-lg font-bold text-slate-900">{formatMonthLabel(selectedMonth)}</div>
+        <button type="button" className="text-sm font-semibold text-slate-600" onClick={() => onChangeMonth(moveMonth(selectedMonth, 1))}>
+          다음달 ›
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-2">
+        {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
+          <div key={day} className={`text-center text-xs font-semibold py-1 ${day === '일' ? 'text-red-500' : day === '토' ? 'text-blue-500' : 'text-slate-500'}`}>
+            {day}
+          </div>
+        ))}
+
+        {cells.map(({ date, isCurrentMonth }) => {
+          const dateStr = toDateString(date);
+          const sunday = isSunday(date);
+          const saturday = isSaturday(date);
+          const selected = dateStr === selectedDate;
+          const blocked = isBlockedHoliday(dateStr);
+          const used = generalSundayRequests[dateStr]?.length ?? 0;
+          const full = requestType === 'general' && sunday && quota > 0 && used >= quota;
+
+          let helper = '';
+          if (isCurrentMonth) {
+            if (blocked) helper = '제한';
+            else if (requestType === 'general' && sunday) helper = `${used}/${quota}`;
+            else if (requestType === 'general') helper = '자유';
+            else helper = '신청';
+          }
+
+          return (
+            <button
+              key={`${dateStr}-${isCurrentMonth ? 'current' : 'other'}`}
+              type="button"
+              onClick={() => {
+                onChangeMonth(dateStr.slice(0, 7));
+                onClickDate(dateStr);
+              }}
+              className={`min-h-[86px] rounded-2xl border p-2 text-left shadow-sm transition ${selected ? 'border-slate-900 bg-slate-100' : 'border-slate-200 bg-white'} ${!isCurrentMonth ? 'bg-slate-50 text-slate-300' : ''} ${blocked ? 'opacity-60' : ''}`}
+            >
+              <div className={`text-sm font-bold ${sunday ? 'text-red-500' : saturday ? 'text-blue-500' : 'text-slate-900'} ${!isCurrentMonth ? 'text-slate-300' : ''}`}>
+                {date.getDate()}
+              </div>
+              <div className={`mt-2 text-[11px] ${sunday ? 'text-red-500' : saturday ? 'text-blue-500' : 'text-slate-500'} ${!isCurrentMonth ? 'text-slate-300' : ''}`}>
+                {koreanDay(date)}
+              </div>
+              {isCurrentMonth && <div className="mt-1 text-[10px] text-slate-500">{helper}</div>}
+              {full && isCurrentMonth && !blocked && <div className="mt-1 text-[10px] text-red-500">마감</div>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export default function SeoulMilkGeochangLeaveSite() {
+  const brandImages = {
+    heroFactory: '',
+    productA2: '',
+    productBottle: '',
+    productCarton: '',
+  };
+  const [selectedMonth, setSelectedMonth] = useState('2026-05');
+  const [selectedDate, setSelectedDate] = useState('2026-05-03');
+  const [activeTab, setActiveTab] = useState<VehicleCategory>('general');
+  const [popupOpen, setPopupOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [notice, setNotice] = useState('');
+
+  const [generalSundayRequests, setGeneralSundayRequests] = useState<Record<string, SundayRequest[]>>(initialGeneralSundayRequests);
+  const [generalWeekdayRequests, setGeneralWeekdayRequests] = useState<WeekdayRequest[]>(initialGeneralWeekdayRequests);
+  const [igoRequests, setIgoRequests] = useState<IgoRequest[]>(initialIgoRequests);
+
+  const [generalForm, setGeneralForm] = useState<{ number: string; name: string; type: GeneralVehicleType; reason: string }>({
+    number: '',
+    name: '',
+    type: '5톤',
+    reason: '',
+  });
+
+  const [igoForm, setIgoForm] = useState<{ number: string; name: string; type: IgoVehicleType }>({
+    number: '',
+    name: '',
+    type: '4.5톤',
+  });
+
+  const selectedDateInfo = useMemo(() => new Date(`${selectedDate}T00:00:00+09:00`), [selectedDate]);
+  const generalStatus = useMemo(() => getGeneralStatus(selectedDate, generalSundayRequests, selectedMonth), [selectedDate, generalSundayRequests, selectedMonth]);
+  const igoStatus = useMemo(() => getIgoStatus(selectedDate, selectedMonth), [selectedDate, selectedMonth]);
+  const monthWindow = useMemo(() => getApplicationWindow(selectedMonth), [selectedMonth]);
+
+  const openPopupForDate = (dateStr: string) => {
+    setSelectedDate(dateStr);
+    setPopupOpen(true);
+  };
+
+  const resetGeneralForm = () => {
+    setGeneralForm({ number: '', name: '', type: '5톤', reason: '' });
+  };
+
+  const resetIgoForm = () => {
+    setIgoForm({ number: '', name: '', type: '4.5톤' });
+  };
+
+  const handleGeneralSubmit = () => {
+    const sunday = isSunday(selectedDateInfo);
+
+    if (!validateVehicle('general', generalForm.number, generalForm.name, generalForm.type)) {
+      setNotice('일반차량 등록정보가 일치하지 않습니다. 차량번호, 이름, 차종을 다시 확인해 주세요.');
+      return;
+    }
+
+    if (!generalStatus.ok) {
+      setNotice(generalStatus.text);
+      return;
+    }
+
+    if (sunday) {
+      const monthPrefix = selectedMonth;
+      const alreadyUsedThisMonth = Object.entries(generalSundayRequests).some(([date, rows]) =>
+        date.startsWith(monthPrefix) && rows.some((row) => row.number === generalForm.number),
+      );
+
+      if (alreadyUsedThisMonth) {
+        setNotice('일반차량 일요일 휴무신청은 월 1회만 가능합니다.');
+        return;
+      }
+
+      const rows = generalSundayRequests[selectedDate] ?? [];
+      setGeneralSundayRequests({
+        ...generalSundayRequests,
+        [selectedDate]: [...rows, { number: generalForm.number, name: generalForm.name, type: generalForm.type, createdAt: '실시간 접수' }],
+      });
+    } else {
+      if (!generalForm.reason.trim()) {
+        setNotice('월요일~토요일 휴무신청은 사유를 반드시 입력해야 합니다.');
+        return;
+      }
+
+      setGeneralWeekdayRequests([
+        ...generalWeekdayRequests,
+        {
+          date: selectedDate,
+          number: generalForm.number,
+          name: generalForm.name,
+          type: generalForm.type,
+          reason: generalForm.reason,
+          createdAt: '실시간 접수',
+        },
+      ]);
+    }
+
+    setNotice(`일반차량 휴무신청이 완료되었습니다. 신청일: ${formatKoreanDate(selectedDate)}`);
+    resetGeneralForm();
+    setPopupOpen(false);
+  };
+
+  const handleIgoSubmit = () => {
+    if (!validateVehicle('igo', igoForm.number, igoForm.name, igoForm.type)) {
+      setNotice('이고차량 등록정보가 일치하지 않습니다. 차량번호, 이름, 차종을 다시 확인해 주세요.');
+      return;
+    }
+
+    if (!igoStatus.ok) {
+      setNotice(igoStatus.text);
+      return;
+    }
+
+    const duplicate = igoRequests.some((row) => row.date === selectedDate && row.number === igoForm.number);
+    if (duplicate) {
+      setNotice('해당 이고차량은 같은 날짜에 이미 신청되어 있습니다.');
+      return;
+    }
+
+    setIgoRequests([
+      ...igoRequests,
+      { date: selectedDate, number: igoForm.number, name: igoForm.name, type: igoForm.type, createdAt: '실시간 접수' },
+    ]);
+
+    setNotice(`이고차량 휴무신청이 완료되었습니다. 신청일: ${formatKoreanDate(selectedDate)}`);
+    resetIgoForm();
+    setPopupOpen(false);
+  };
+
+  const renderGeneralPopupGuide = () => {
+    if (isSunday(selectedDateInfo)) {
+      return (
+        <div className="rounded-2xl bg-slate-100 p-3 text-sm font-semibold text-slate-900">
+          일반차량 일요일 휴무신청은 전월 <span className="text-red-500">20일 16:00부터 23일 16:00까지</span> 신청할 수 있으며, 일요일 휴무신청은 월 1회만 접수됩니다.
+          <div className="mt-2 text-sm text-slate-700">{generalStatus.text}</div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="rounded-2xl bg-slate-100 p-3 text-sm font-semibold text-slate-900">
+        일반차량 평일 휴무신청은 별도 신청 기간 없이 자유롭게 신청할 수 있으며, <span className="text-red-500">당일 신청은 12:00까지</span> 가능합니다.
+        {!generalStatus.ok && <div className="mt-2 text-sm text-slate-700">{generalStatus.text}</div>}
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-slate-50 p-4 pb-24">
+      <div className="mx-auto max-w-md space-y-4">
+        <Card className="overflow-hidden rounded-[28px] border-0 shadow-xl">
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-950/80 via-emerald-900/65 to-slate-900/50" />
+            {brandImages.heroFactory ? (
+              <img src={brandImages.heroFactory} alt="서울우유 공장 전경" className="h-56 w-full object-cover" />
+            ) : (
+              <div className="flex h-56 w-full items-center justify-center bg-gradient-to-r from-emerald-800 via-emerald-700 to-slate-700">
+                <div className="flex flex-col items-center gap-2 text-white/90">
+                  <Building2 className="h-10 w-10" />
+                  <div className="text-sm font-semibold">거창공장 대표 이미지 영역</div>
+                </div>
+              </div>
+            )}
+            <div className="absolute inset-x-0 top-0 p-5 text-white">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur">SEOUL MILK · GEOCHANG LOGISTICS</div>
+                <CalendarDays className="h-8 w-8" />
+              </div>
+              <div className="max-w-[75%]">
+                <h1 className="text-2xl font-extrabold tracking-tight">서울우유 거창물류</h1>
+                <p className="mt-2 text-sm leading-6 text-emerald-50">모바일 휴무신청 시스템 · 출하 운영 기준에 맞춘 차량 휴무신청 전용 페이지</p>
+              </div>
+            </div>
+            <div className="absolute inset-x-0 bottom-0 p-4">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-2xl bg-white/90 p-3 text-center text-[11px] font-semibold text-slate-800 backdrop-blur">일반차량 / 이고차량 분리</div>
+                <div className="rounded-2xl bg-white/90 p-3 text-center text-[11px] font-semibold text-slate-800 backdrop-blur">관리자 전용 조회</div>
+                <div className="rounded-2xl bg-white/90 p-3 text-center text-[11px] font-semibold text-slate-800 backdrop-blur">명절 별도 관리</div>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="rounded-3xl border border-emerald-100 bg-white/90 shadow-sm">
+          <CardContent className="pt-5">
+            <div className="flex items-start gap-3">
+              <div className="rounded-2xl bg-emerald-100 p-2 text-emerald-700">
+                <Milk className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-bold text-slate-900">서울우유 브랜드 톤 안내</div>
+                <div className="mt-1 text-sm leading-6 text-slate-600">현재 화면은 서울우유 느낌이 나도록 <span className="font-semibold text-emerald-700">화이트 · 그린 · 레드 포인트</span> 중심으로 구성했습니다. 공장 전경, A2 우유, 일반 제품 이미지를 상단/중간 배너에 연결하면 브랜드 인상이 더 강해집니다.</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-3 gap-3">
+          <Card className="overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-sm">
+            <div className="aspect-[3/4] bg-slate-100">
+              {brandImages.productA2 ? (
+                <img src={brandImages.productA2} alt="서울우유 A2 플러스우유" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full items-center justify-center text-slate-400"><ImageIcon className="h-8 w-8" /></div>
+              )}
+            </div>
+            <div className="p-3 text-center text-xs font-semibold text-slate-700">A2 플러스우유</div>
+          </Card>
+          <Card className="overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-sm">
+            <div className="aspect-[3/4] bg-slate-100">
+              {brandImages.productBottle ? (
+                <img src={brandImages.productBottle} alt="서울우유 제품 이미지" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full items-center justify-center text-slate-400"><ImageIcon className="h-8 w-8" /></div>
+              )}
+            </div>
+            <div className="p-3 text-center text-xs font-semibold text-slate-700">브랜드 제품컷</div>
+          </Card>
+          <Card className="overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-sm">
+            <div className="aspect-[3/4] bg-slate-100">
+              {brandImages.productCarton ? (
+                <img src={brandImages.productCarton} alt="서울우유 우유팩 이미지" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full items-center justify-center text-slate-400"><ImageIcon className="h-8 w-8" /></div>
+              )}
+            </div>
+            <div className="p-3 text-center text-xs font-semibold text-slate-700">대표 우유팩</div>
+          </Card>
+        </div>
+
+        <Card className="rounded-3xl border border-emerald-100 bg-white shadow-sm">
+          <CardContent className="space-y-3 pt-6">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold">신청 대상 월</Label>
+              <div className="text-sm font-bold text-slate-900">{formatMonthLabel(selectedMonth)}</div>
+            </div>
+            <div className="rounded-2xl bg-emerald-50 p-3 text-xs leading-5 text-emerald-900">
+              접수 시작: {monthWindow.open.getMonth() + 1}월 {monthWindow.open.getDate()}일 16:00
+              <br />
+              접수 마감: {monthWindow.close.getMonth() + 1}월 {monthWindow.close.getDate()}일 16:00
+            </div>
+          </CardContent>
+        </Card>
+
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as VehicleCategory)} className="space-y-4">
+          <TabsList className="grid h-auto grid-cols-2 rounded-2xl bg-emerald-50 p-1">
+            <TabsTrigger value="general" className="rounded-2xl py-3 data-[state=active]:bg-emerald-700 data-[state=active]:text-white">일반차량</TabsTrigger>
+            <TabsTrigger value="igo" className="rounded-2xl py-3 data-[state=active]:bg-emerald-700 data-[state=active]:text-white">이고차량</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="general" className="space-y-4">
+            <Card className="rounded-3xl border border-emerald-100 shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base"><Truck className="h-4 w-4" />일반차량 휴무신청</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <MobileCalendar
+                  selectedMonth={selectedMonth}
+                  selectedDate={selectedDate}
+                  requestType="general"
+                  generalSundayRequests={generalSundayRequests}
+                  onChangeMonth={setSelectedMonth}
+                  onClickDate={openPopupForDate}
+                />
+                <div className="rounded-2xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">날짜를 선택하면 일반차량 휴무신청 팝업이 열립니다.</div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="igo" className="space-y-4">
+            <Card className="rounded-3xl border border-emerald-100 shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base"><Truck className="h-4 w-4" />이고차량 휴무신청</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <MobileCalendar
+                  selectedMonth={selectedMonth}
+                  selectedDate={selectedDate}
+                  requestType="igo"
+                  generalSundayRequests={generalSundayRequests}
+                  onChangeMonth={setSelectedMonth}
+                  onClickDate={openPopupForDate}
+                />
+                <div className="rounded-2xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">날짜를 선택하면 이고차량 휴무신청 팝업이 열립니다.</div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {notice && (
+          <Card className="rounded-3xl border border-emerald-200 bg-emerald-50 shadow-sm">
+            <CardContent className="pt-6 text-sm text-emerald-700">{notice}</CardContent>
+          </Card>
+        )}
+
+        <Dialog open={popupOpen} onOpenChange={setPopupOpen}>
+          <DialogContent className="max-w-md rounded-3xl">
+            <DialogHeader>
+              <DialogTitle className="text-lg">{activeTab === 'general' ? '일반차량 휴무신청' : '이고차량 휴무신청'}</DialogTitle>
+              <DialogDescription className="text-sm leading-6">
+                선택 날짜: <span className="font-semibold text-slate-900">{formatKoreanDate(selectedDate)}</span>
+              </DialogDescription>
+            </DialogHeader>
+
+            {activeTab === 'general' ? (
+              <div className="space-y-4">
+                {renderGeneralPopupGuide()}
+                <div className="grid gap-3">
+                  <div>
+                    <Label>차량번호 4자리</Label>
+                    <Input value={generalForm.number} onChange={(e) => setGeneralForm({ ...generalForm, number: e.target.value.replace(/\D/g, '').slice(0, 4) })} className="mt-1 rounded-2xl" placeholder="예: 1234" inputMode="numeric" />
+                  </div>
+                  <div>
+                    <Label>이름</Label>
+                    <Input value={generalForm.name} onChange={(e) => setGeneralForm({ ...generalForm, name: e.target.value })} className="mt-1 rounded-2xl" placeholder="예: 홍길동" />
+                  </div>
+                  <div>
+                    <Label>차종</Label>
+                    <select value={generalForm.type} onChange={(e) => setGeneralForm({ ...generalForm, type: e.target.value as GeneralVehicleType })} className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                      <option value="2.5톤">2.5톤</option>
+                      <option value="3.5톤">3.5톤</option>
+                      <option value="5톤">5톤</option>
+                    </select>
+                  </div>
+                  {!isSunday(selectedDateInfo) && (
+                    <div>
+                      <Label>휴무 사유</Label>
+                      <Textarea value={generalForm.reason} onChange={(e) => setGeneralForm({ ...generalForm, reason: e.target.value })} className="mt-1 rounded-2xl" placeholder="월요일~토요일 신청 시 사유를 입력해 주세요." />
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button type="button" variant="outline" className="rounded-2xl py-6" onClick={() => setPopupOpen(false)}>
+                      취소
+                    </Button>
+                    <Button type="button" className="rounded-2xl py-6 text-base" onClick={handleGeneralSubmit}>
+                      일반차량 휴무신청
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-2xl bg-slate-100 p-3 text-sm font-semibold text-slate-900">
+                  이고차량 휴무신청은 전월 <span className="text-red-500">20일 16:00부터 23일 16:00까지</span> 신청할 수 있으며, 마감 이후에는 추가 신청이 불가합니다.
+                  <div className="mt-2 text-sm text-slate-700">{igoStatus.text}</div>
+                </div>
+                <div className="grid gap-3">
+                  <div>
+                    <Label>차량번호 4자리</Label>
+                    <Input value={igoForm.number} onChange={(e) => setIgoForm({ ...igoForm, number: e.target.value.replace(/\D/g, '').slice(0, 4) })} className="mt-1 rounded-2xl" placeholder="예: 4567" inputMode="numeric" />
+                  </div>
+                  <div>
+                    <Label>이름</Label>
+                    <Input value={igoForm.name} onChange={(e) => setIgoForm({ ...igoForm, name: e.target.value })} className="mt-1 rounded-2xl" placeholder="예: 홍길동" />
+                  </div>
+                  <div>
+                    <Label>차종</Label>
+                    <select value={igoForm.type} onChange={(e) => setIgoForm({ ...igoForm, type: e.target.value as IgoVehicleType })} className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                      <option value="4.5톤">4.5톤</option>
+                      <option value="14톤">14톤</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button type="button" variant="outline" className="rounded-2xl py-6" onClick={() => setPopupOpen(false)}>
+                      취소
+                    </Button>
+                    <Button type="button" className="rounded-2xl py-6 text-base" onClick={handleIgoSubmit}>
+                      이고차량 휴무신청
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        <Card className="rounded-3xl border border-emerald-100 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base"><Megaphone className="h-4 w-4" />월 휴무 게시판</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {monthlyBoardPosts.map((post, idx) => (
+              <div key={idx} className="rounded-2xl border border-slate-200 p-3">
+                <div className="text-sm font-semibold">{post.title}</div>
+                <div className="mt-1 text-xs text-slate-500">대상월: {post.month}</div>
+                <div className="mt-2 text-sm leading-6 text-slate-700">{post.body}</div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border border-emerald-100 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-4 w-4" />특이사항 공지</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {specialNoticePosts.map((post, idx) => (
+              <div key={idx} className="rounded-2xl border border-slate-200 p-3">
+                <div className="text-sm font-semibold">{post.title}</div>
+                <div className="mt-2 text-sm leading-6 text-slate-700">{post.body}</div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border border-emerald-100 shadow-sm">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-4 w-4" />관리자 전용</CardTitle>
+              <Button variant="outline" className="rounded-2xl" onClick={() => setIsAdmin((prev) => !prev)}>
+                {isAdmin ? '관리자 닫기' : '관리자 보기'}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {!isAdmin ? (
+              <div className="flex items-center gap-2 rounded-2xl bg-slate-100 p-4 text-sm text-slate-600">
+                <Lock className="h-4 w-4" />신청 현황, 신청 인원, 사유, 상세 명단은 관리자만 열람 가능합니다.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-200 p-4">
+                  <div className="mb-2 text-sm font-semibold">일반차량 일요일 신청 현황</div>
+                  <div className="space-y-2 text-sm">
+                    {Object.entries(generalSundayRequests).map(([date, rows]) => (
+                      <div key={date} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+                        <span>{formatKoreanDate(date)}</span>
+                        <span>{rows.length}명 / {sundayQuotaByMonth[date.slice(0, 7)] ?? 0}명</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 p-4">
+                  <div className="mb-2 text-sm font-semibold">일반차량 평일 신청 내역</div>
+                  <div className="space-y-2 text-sm">
+                    {generalWeekdayRequests.length === 0 ? (
+                      <div className="rounded-xl bg-slate-50 px-3 py-2 text-slate-500">신청 내역이 없습니다.</div>
+                    ) : (
+                      generalWeekdayRequests.map((row, idx) => (
+                        <div key={`${row.date}-${row.number}-${idx}`} className="rounded-xl bg-slate-50 px-3 py-2">
+                          {formatKoreanDate(row.date)} / {row.number} / {row.name} / {row.type}
+                          <br />
+                          <span className="text-slate-500">사유: {row.reason}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 p-4">
+                  <div className="mb-2 text-sm font-semibold">이고차량 신청 내역</div>
+                  <div className="space-y-2 text-sm">
+                    {igoRequests.length === 0 ? (
+                      <div className="rounded-xl bg-slate-50 px-3 py-2 text-slate-500">신청 내역이 없습니다.</div>
+                    ) : (
+                      igoRequests.map((row, idx) => (
+                        <div key={`${row.date}-${row.number}-${idx}`} className="rounded-xl bg-slate-50 px-3 py-2">
+                          {formatKoreanDate(row.date)} / {row.number} / {row.name} / {row.type}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
 
